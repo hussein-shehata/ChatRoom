@@ -13,14 +13,42 @@
 #include <string>
 #include <thread>
 #include <fstream>
-
+#include <vector>
 #include <cstring>
+
+
+using namespace std;
 
 #define SERVER_NAME_LENGTH		6
 static char ServerName [SERVER_NAME_LENGTH + 1]= "SERVER";
 
+int MaxLength = 200;
 
-using namespace std;
+vector<SOCKET> AcceptedClientsSockets;
+
+
+
+
+/******************** Helper Functio for debugging *****************/
+void PrintMessage(char* Message)
+{
+  int i = 0;
+  while( Message[i] != 0 && Message[i] !='\n')
+    {
+      cout<<Message[i];
+      i++;
+    }
+  cout<<endl;
+}
+
+
+
+
+
+
+
+
+
 
 void ReadIPAddressAndPortNumber(string &IPAddress, int &PortNumber)
 {
@@ -73,18 +101,21 @@ int inet_ptonnn(int af, const char *src, void *dst)
 
 
 
-void SendToClient(const SOCKET &ClientSocket, int MaxLength)
+
+void SendToClient(const SOCKET &ClientSocket,char* ToBeSentMessage, int Length, bool Broadcast, bool AllClients)
 {
-      char Buffer[MaxLength + SERVER_NAME_LENGTH];
-      strcpy(Buffer, ServerName);
-  while(1)
+  if(Broadcast == true)
     {
+      /// Broadcasting a server message like giving a maintenance warning
+      char Buffer[Length + SERVER_NAME_LENGTH];
+      strcpy(Buffer, ServerName);
+
 
       Buffer[SERVER_NAME_LENGTH ] = ' ';
       Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
       Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
 
-//      cout<<"Enter ur message to the client"<<endl;
+      //      cout<<"Enter ur message to the client"<<endl;
       cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
 
 
@@ -92,39 +123,120 @@ void SendToClient(const SOCKET &ClientSocket, int MaxLength)
 
       if(ByteCount > 0)
 	{
-//	  cout<<"Sent Successfully"<<endl;
+	  //	  cout<<"Sent Successfully"<<endl;
 	}
       else
 	{
 	  cout<<"Send Failed"<<endl;
 	  WSACleanup();
 	}
+
     }
-}
+  else if(AllClients == true && Broadcast == false)
+    {
+      /// Just Trasmitting the client message to all the clients
 
+      int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
+    }
+  else if(AllClients == false && Broadcast == false)
+    {
+      /// Giving a certain Client a message like warning for example
 
-// We have to make it constant or not using reference at all
-void ReceiveFromClient(const SOCKET &ClientSocket, int MaxLength) //TODO we can make a parameter to receive the incoming string if we want to
-{
-  while(1)
+      int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
+    }
+  else
     {
 
-      char Buffer[MaxLength + 100];
-      int ByteCount = recv(ClientSocket, Buffer, MaxLength + 100, 0);
+    }
+}
 
-      if(ByteCount > 0)
+
+void SendToAllClients(char* ToBeSentMessage, int Length, bool Broadcast)
+{
+  // Iterating at all the Client Sockets
+  for (SOCKET& CurrentClientSocket: AcceptedClientsSockets)
+    {
+      SendToClient(CurrentClientSocket, ToBeSentMessage, Length, Broadcast, true);
+    }
+}
+
+// We have to make it constant or not using reference at all
+void ReceiveFromClients() //TODO we can make a parameter to receive the incoming string if we want to
+{
+  DWORD timeout = 100;
+  while(1)
+    {
+      for (SOCKET& CurrentClientSocket: AcceptedClientsSockets)
 	{
-	  cout<<Buffer<<endl;
-	}
-      else
-	{
-//	  cout<<"Receiving Failed"<<endl;
-	  WSACleanup();
+	  char Buffer[MaxLength];
+
+	  setsockopt(CurrentClientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)); //setting Timeout
+	  int ByteCount = recv(CurrentClientSocket, Buffer, MaxLength, 0);
+
+	  if(ByteCount == SOCKET_ERROR)
+	    {
+	      if (WSAGetLastError() == WSAETIMEDOUT)
+		{
+		  // Timeout Happens so do nothing
+//		  cout<<"Server didnot receve anything"<<endl;
+		  continue;
+		}
+	      else
+		{
+		  cout<<"error in Receving the message"<<endl;
+		  WSACleanup();
+		  return ;
+		}
+	    }
+	  else{
+
+	      bool DetectedOffensiveLanguage = false;
+
+	      //TODO if there is  Offensive language in the received message make the boolen value = true and send a warning to the client
+	      if(Buffer[15] == 'Q')
+		{
+		  DetectedOffensiveLanguage = true;
+		}
+	      if(ByteCount > 0 && DetectedOffensiveLanguage == false)
+		{
+		  //	  cout<<Buffer<<endl;
+		  SendToAllClients(Buffer, MaxLength, false);
+		}
+	      else if(ByteCount > 0 && DetectedOffensiveLanguage == true)
+		{
+		  //TODO Send a warning message
+		  char WarningMessage[MaxLength] = "Server  :::::  Warning !!! you have said an offensive, your message wont be sent to the other members \0";
+		  SendToClient(CurrentClientSocket, WarningMessage, MaxLength, false, false);
+		}
+	      else
+		{
+		  //	  cout<<"Receiving Failed"<<endl;
+		  WSACleanup();
+		}
+	  }
 	}
     }
 }
 
 
+// TODO make it on an another thread but only wake ups every 1 min for now
+void BroadcastMessage(void)
+{
+  char Buffer[MaxLength + SERVER_NAME_LENGTH];
+  strcpy(Buffer, ServerName);
+
+
+  Buffer[SERVER_NAME_LENGTH ] = ' ';
+  Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
+  Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
+  cout<<"Enter a BroadcastMessage"<<endl;
+
+  //      cout<<"Enter ur message to the client"<<endl;
+  cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
+
+  SendToAllClients(Buffer, MaxLength + SERVER_NAME_LENGTH, true);
+
+}
 
 void SetColor(int textColor)
 {
@@ -201,6 +313,7 @@ int main() {
 
 
   acceptSocket = accept(serverSocket, NULL, NULL);
+
   if(acceptSocket == INVALID_SOCKET)
     {
       cout<<"accept Failed: "<<WSAGetLastError()<<endl;
@@ -209,11 +322,14 @@ int main() {
     }
   cout<<"Accepted connection"<<endl;
 
+  AcceptedClientsSockets.push_back(acceptSocket);
 
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(hConsole, 12);
-  thread Worker1(SendToClient, acceptSocket, 300);
-  thread Worker2(ReceiveFromClient,acceptSocket, 300);
+
+
+//  thread Worker1(SendToClient, acceptSocket, 300);
+  thread Worker2(ReceiveFromClients);
 
   while(1)
     {
@@ -224,12 +340,13 @@ int main() {
           WSACleanup();
           return -1;
         }
+      AcceptedClientsSockets.push_back(acceptSocket);
       cout<<"Accepted connection"<<endl;
     }
 //  SendToClient(acceptSocket, 200);
 //  ReceiveFromClient(acceptSocket, 200);
 
-  Worker1.join();
+//  Worker1.join();
   Worker2.join();
 
 
