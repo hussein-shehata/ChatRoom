@@ -10,29 +10,43 @@
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #include <iostream>
+#include <cstring>
 
 #include <thread>
 
 using namespace std;
 
+static char ClientName [100]="";
 
 void SendToServer(SOCKET ServerSocket, int MaxLength)
 {
   while(1)
     {
-      char Buffer[MaxLength];
-      cout<<"Enter your message to the server"<<endl;
-      cin.getline(Buffer,MaxLength);
+      char Buffer[MaxLength + 100];
+      strcpy(Buffer, ClientName);
+      int i = 0;
+      while (Buffer[i] != '\0' &&  i < 100)
+      {
+	  i++;
 
-      int ByteCount = send(ServerSocket, Buffer, MaxLength, 0);
+      }
+      int ClientNameLength = i ;
+      Buffer[ClientNameLength] = ' ';
+      Buffer[ClientNameLength + 1 ] = ':';
+      Buffer[ClientNameLength + 2 ] = ' ';
+      //      cout<<"Enter your message to the server"<<endl;
+      cin.getline(&Buffer[ClientNameLength + 3 ],MaxLength);
 
+
+      int ByteCount = send(ServerSocket, Buffer, (MaxLength + 100), 0);
+//      cout<<"Buffer is "<<Buffer<<"Contninue"<<endl;
       if(ByteCount > 0)
 	{
-	  cout<<"Sent Successfully"<<endl;
+//	  cout<<"Sent Successfully"<<endl;
 	}
       else
 	{
-	  cout<<"Send Failed"<<endl;
+//	  cout<<"Send Failed"<<endl;
 	  WSACleanup();
 	}
     }
@@ -46,16 +60,16 @@ void ReceiveFromServer(SOCKET ServerSocket, int MaxLength) //TODO we can make a 
   while(1)
     {
 
-      char Buffer[MaxLength];
-      int ByteCount = recv(ServerSocket, Buffer, MaxLength, 0);
+      char Buffer[MaxLength + 100];
+      int ByteCount = recv(ServerSocket, Buffer, (MaxLength + 100), 0);
 
       if(ByteCount > 0)
 	{
-	  cout<<"Message Received : "<<Buffer<<endl;
+	  cout<<Buffer<<endl;
 	}
       else
 	{
-	  cout<<"Receiving Failed"<<endl;
+//	  cout<<"Receiving Failed"<<endl;
 	  WSACleanup();
 	}
     }
@@ -146,11 +160,14 @@ int main() {
       cout<<"Client can send and receive now..."<<endl;
     }
 
+//
+  cout<<"Please Enter Your Name"<<endl;
+  cin.getline(ClientName,100);
 
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(hConsole, 9);
-  thread Worker1(SendToServer, clientSocket, 200);
-  thread Worker2(ReceiveFromServer,clientSocket, 200);
+  thread Worker1(SendToServer, clientSocket, 300);
+  thread Worker2(ReceiveFromServer,clientSocket, 300);
 
 
   Worker1.join();

@@ -14,6 +14,11 @@
 #include <thread>
 #include <fstream>
 
+#include <cstring>
+
+#define SERVER_NAME_LENGTH		6
+static char ServerName [SERVER_NAME_LENGTH + 1]= "SERVER";
+
 
 using namespace std;
 
@@ -70,17 +75,24 @@ int inet_ptonnn(int af, const char *src, void *dst)
 
 void SendToClient(const SOCKET &ClientSocket, int MaxLength)
 {
+      char Buffer[MaxLength + SERVER_NAME_LENGTH];
+      strcpy(Buffer, ServerName);
   while(1)
     {
-      char Buffer[MaxLength];
-      cout<<"Enter ur message to the client"<<endl;
-      cin.getline(Buffer,MaxLength);
 
-      int ByteCount = send(ClientSocket, Buffer, MaxLength, 0);
+      Buffer[SERVER_NAME_LENGTH ] = ' ';
+      Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
+      Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
+
+//      cout<<"Enter ur message to the client"<<endl;
+      cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
+
+
+      int ByteCount = send(ClientSocket, Buffer, MaxLength + 100, 0);
 
       if(ByteCount > 0)
 	{
-	  cout<<"Sent Successfully"<<endl;
+//	  cout<<"Sent Successfully"<<endl;
 	}
       else
 	{
@@ -90,21 +102,23 @@ void SendToClient(const SOCKET &ClientSocket, int MaxLength)
     }
 }
 
+
+// We have to make it constant or not using reference at all
 void ReceiveFromClient(const SOCKET &ClientSocket, int MaxLength) //TODO we can make a parameter to receive the incoming string if we want to
 {
   while(1)
     {
 
-      char Buffer[MaxLength];
-      int ByteCount = recv(ClientSocket, Buffer, MaxLength, 0);
+      char Buffer[MaxLength + 100];
+      int ByteCount = recv(ClientSocket, Buffer, MaxLength + 100, 0);
 
       if(ByteCount > 0)
 	{
-	  cout<<"Message Received : "<<Buffer<<endl;
+	  cout<<Buffer<<endl;
 	}
       else
 	{
-	  cout<<"Receiving Failed"<<endl;
+//	  cout<<"Receiving Failed"<<endl;
 	  WSACleanup();
 	}
     }
@@ -198,9 +212,20 @@ int main() {
 
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(hConsole, 12);
-  thread Worker1(SendToClient, acceptSocket, 200);
-  thread Worker2(ReceiveFromClient,acceptSocket, 200);
+  thread Worker1(SendToClient, acceptSocket, 300);
+  thread Worker2(ReceiveFromClient,acceptSocket, 300);
 
+  while(1)
+    {
+      acceptSocket = accept(serverSocket, NULL, NULL);
+      if(acceptSocket == INVALID_SOCKET)
+        {
+          cout<<"accept Failed: "<<WSAGetLastError()<<endl;
+          WSACleanup();
+          return -1;
+        }
+      cout<<"Accepted connection"<<endl;
+    }
 //  SendToClient(acceptSocket, 200);
 //  ReceiveFromClient(acceptSocket, 200);
 
