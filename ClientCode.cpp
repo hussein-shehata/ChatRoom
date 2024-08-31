@@ -18,6 +18,43 @@ using namespace std;
 
 static char ClientName [100]="";
 
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+
+void enableANSI() {
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    GetConsoleMode(hOut, &dwMode);
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, dwMode);
+}
+
+void ClearAboveLine(void)
+{
+  cout << "\033[A";  // Move cursor up one line
+  cout << "\033[2K"; // Clear the entire line
+}
+
+
+void SendNameToServer(SOCKET& ServerSocket)
+{
+  cout<<"Please Enter Your Name"<<endl;
+  cin.getline(ClientName,100);
+
+  char FlagToServer[100] = "#!#!";
+  strcat(FlagToServer, ClientName);
+
+  int ByteCount = send(ServerSocket, FlagToServer, (100 + 100), 0);
+
+        if(ByteCount > 0)
+  	{
+
+  	}
+        else
+  	{
+  	  WSACleanup();
+  	}
+
+}
 void SendToServer(SOCKET ServerSocket, int MaxLength)
 {
   while(1)
@@ -36,8 +73,13 @@ void SendToServer(SOCKET ServerSocket, int MaxLength)
       Buffer[ClientNameLength + 2 ] = ' ';
       //      cout<<"Enter your message to the server"<<endl;
       cin.getline(&Buffer[ClientNameLength + 3 ],MaxLength);
-
-
+      ClearAboveLine();
+      if(Buffer[ClientNameLength + 3 ] == '\n' ||  Buffer[ClientNameLength + 3 ] == '\0')
+	{
+	  //Do not send enter alone
+	  cout<<"You only entered an enter alone"<<endl;
+	  continue;
+	}
       int ByteCount = send(ServerSocket, Buffer, (MaxLength + 100), 0);
 //      cout<<"Buffer is "<<Buffer<<"Contninue"<<endl;
       if(ByteCount > 0)
@@ -108,7 +150,7 @@ void SetColor(int textColor)
 }
 
 int main() {
-
+  enableANSI(); // Enable ANSI escape codes on Windows
   SOCKET 	clientSocket;
   int port = 55555;
   WSADATA wsaData;
@@ -161,8 +203,7 @@ int main() {
     }
 
 //
-  cout<<"Please Enter Your Name"<<endl;
-  cin.getline(ClientName,100);
+  SendNameToServer(clientSocket);
 
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(hConsole, 9);
