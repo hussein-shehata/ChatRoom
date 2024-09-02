@@ -10,16 +10,20 @@
 
 #include <winsock2.h>
 #include <iostream>
+#include "ClientMessageClass.hpp"
 
 class Client{
   private:
-    char Name[100]= {0};
+
 //    char Buffer[100]="";
     int NumberOfWarnings = 0;
     SOCKET ClientSocket = 0;
     bool ValidClient = false;
 
+
   public:
+    ClientMessage ReceivedClientMessage;//TODO make it private with getter
+    Flags MessageFlags; //TODO make it private with getter
     int GetName(char* RecevingBuffer);
     int SetName(char* RecevedName);
     void PrintName(void);

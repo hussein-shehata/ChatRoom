@@ -24,7 +24,7 @@ using namespace std;
 #define SERVER_NAME_LENGTH		6
 static char ServerName [SERVER_NAME_LENGTH + 1]= "SERVER";
 
-int MaxLength = 200;
+int MaxLength = 52000;
 
 vector<SOCKET> AcceptedClientsSockets;
 vector<Client> AcceptedClients;
@@ -32,7 +32,7 @@ vector<Client> AcceptedClients;
 
 
 
-/******************** Helper Functio for debugging *****************/
+/******************** Helper Function for debugging *****************/
 void PrintMessage(char* Message)
 {
   int i = 0;
@@ -107,50 +107,50 @@ int inet_ptonnn(int af, const char *src, void *dst)
 
 void SendToClient(const SOCKET &ClientSocket,char* ToBeSentMessage, int Length, bool Broadcast, bool AllClients)
 {
-  if(Broadcast == true)
-    {
-      /// Broadcasting a server message like giving a maintenance warning
-//      char Buffer[Length + SERVER_NAME_LENGTH];
-//      strcpy(Buffer, ServerName);
-//
-//
-//      Buffer[SERVER_NAME_LENGTH ] = ' ';
-//      Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
-//      Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
-//
-//      //      cout<<"Enter ur message to the client"<<endl;
-//      cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
-
-
-      int ByteCount = send(ClientSocket, ToBeSentMessage, MaxLength + 100, 0);
-
-      if(ByteCount > 0)
+	if(Broadcast == true)
 	{
-	  //	  cout<<"Sent Successfully"<<endl;
+		/// Broadcasting a server message like giving a maintenance warning
+		//      char Buffer[Length + SERVER_NAME_LENGTH];
+		//      strcpy(Buffer, ServerName);
+		//
+		//
+		//      Buffer[SERVER_NAME_LENGTH ] = ' ';
+		//      Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
+		//      Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
+		//
+		//      //      cout<<"Enter ur message to the client"<<endl;
+		//      cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
+
+
+		int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
+		if(ByteCount > 0)
+		{
+//		  cout<<"Sent Successfully"<<endl;
+		}
+		else
+		{
+			cout<<"Send Failed"<<endl;
+			WSACleanup();
+		}
+
 	}
-      else
+	else if(AllClients == true && Broadcast == false)
 	{
-	  cout<<"Send Failed"<<endl;
-	  WSACleanup();
+		/// Just Trasmitting the client message to all the clients
+
+//		cout<<"Sending to All Clients"<<endl;
+		int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
 	}
+	else if(AllClients == false && Broadcast == false)
+	{
+		/// Giving a certain Client a message like warning for example
+//		cout<<"Sending to the Client"<<endl;
+		int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
+	}
+	else
+	{
 
-    }
-  else if(AllClients == true && Broadcast == false)
-    {
-      /// Just Trasmitting the client message to all the clients
-
-      int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
-    }
-  else if(AllClients == false && Broadcast == false)
-    {
-      /// Giving a certain Client a message like warning for example
-
-      int ByteCount = send(ClientSocket, ToBeSentMessage, Length, 0);
-    }
-  else
-    {
-
-    }
+	}
 }
 
 
@@ -171,21 +171,26 @@ void SendToAllClients(char* ToBeSentMessage, int Length, bool Broadcast)
     }
 }
 
-bool IsAMessageToServer(Client& CurrentClient,char* Buffer)
+bool IsAMessageToServer(Client& CurrentClient)
 {
-  if(Buffer[0] =='#' && Buffer[1] =='!' && Buffer[2] =='#' && Buffer[3] =='!')
-    {
-      //then the client give me his name
-      CurrentClient.SetName(&Buffer[4]);
-      char WelcomingMessage[100] = "SERVER: Please Welcome our new member : ";
-      char ClientName[100];
-      CurrentClient.GetName(ClientName);
-      strcat(WelcomingMessage, ClientName);
-      SendToAllClients(WelcomingMessage, MaxLength, true);
+	unsigned char Flag = CurrentClient.ReceivedClientMessage.GetNewNameFlag();
+	char Buffer[MaxLength];
+	if( (Flag & 0x01) == 1)
+	{
+		//then the client is sending his name only and there is no message
+		ClientMessage ToBeSentMessage;
+		ToBeSentMessage.SetName("SERVER");
+		ToBeSentMessage.SetMessage("Please Welcome our new member : " + CurrentClient.ReceivedClientMessage.GetName());
 
-      return true;
-    }
-  return false;
+		int Length = ToBeSentMessage.Serialize(Buffer);
+
+		CurrentClient.SetValidClient(true);
+		SendToAllClients(Buffer, Length, true);
+
+
+		return true;
+	}
+	return false;
 
 }
 
@@ -196,15 +201,10 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
   DWORD timeout = 100;
   while(1)
     {
-//      int idx = 0;
       for (Client& CurrentClient: AcceptedClients)
 	{
 	  char Buffer[MaxLength];
-//	  cout<<"We have Client "<<idx<<endl;
-//	  idx++;
-//	  cout<<"we got the socket which is ";
 	  SOCKET ClientSocket = CurrentClient.GetClientSocket();
-//	  cout<<ClientSocket<<endl;
 
 
 	  setsockopt( ClientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)); //setting Timeout
@@ -215,7 +215,6 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	      if (WSAGetLastError() == WSAETIMEDOUT)
 		{
 		  // Timeout Happens so do nothing
-//		  cout<<"Server didnot receve anything"<<endl;
 		  continue;
 		}
 	      else
@@ -225,10 +224,13 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 		  return ;
 		}
 	    }
-	  else{
+	  else
+	    {
+	      // Deserialize Incoming Message
+	      CurrentClient.ReceivedClientMessage.Deserialize(Buffer);
+
 	      //Check if it Message to Server
-	      //	      cout<<"Server receve something"<<endl;
-	      if(IsAMessageToServer(CurrentClient, Buffer) == true)
+	      if(IsAMessageToServer(CurrentClient) == true)
 		{
 		  continue;
 		}
@@ -243,11 +245,12 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 
 		  else
 		    {
-		      CurrentClient.SetName(Buffer);
-		      char WelcomingMessage[100] = "SERVER: Please Welcome our new member : ";
-		      char ClientName[100];
-		      CurrentClient.GetName(ClientName);
-		      strcat(WelcomingMessage, ClientName);
+		      // TODO : Till we handle the Validity of the client
+		      //						CurrentClient.SetName(Buffer);
+		      //						char WelcomingMessage[100] = "SERVER: Please Welcome our new member : ";
+		      //						char ClientName[100];
+		      //						CurrentClient.GetName(ClientName);
+		      //						strcat(WelcomingMessage, ClientName);
 
 		    }
 		}
@@ -256,54 +259,60 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 
 
 	      bool DetectedOffensiveLanguage = false;
-
+	      string ReceivedMessage = CurrentClient.ReceivedClientMessage.GetClientMessage();
+	      int Length = CurrentClient.ReceivedClientMessage.GetLengthOfMessage();
 	      //TODO if there is  Offensive language in the received message make the boolen value = true and send a warning to the client
-	      if(Buffer[15] == 'Q')
+	      if(ReceivedMessage[1] == 'Q')
 		{
 		  DetectedOffensiveLanguage = true;
 		}
 	      if(ByteCount > 0 && DetectedOffensiveLanguage == false)
 		{
 		  //	  cout<<Buffer<<endl;
-		  if(Buffer[0] == '\n' || Buffer[0] == '\0' || (Buffer[0] == ' '&& Buffer[1] == '\0') )
+		  if(ReceivedMessage[0] == '\n' || ReceivedMessage[0] == '\0' || (ReceivedMessage[0] == ' '&& ReceivedMessage[1] == '\0') )
 		    {
 		      continue;
 		    }
 		  else
 		    {
-		      SendToAllClients(Buffer, MaxLength, false);
+		      SendToAllClients(Buffer, Length, false);
 		    }
 		}
 	      else if(ByteCount > 0 && DetectedOffensiveLanguage == true)
 		{
+		  ClientMessage NotificationMessage;
+		  NotificationMessage.SetName("SERVER");
+		  char WarningMessage[300];
 		  //TODO Send a warning message
 		  if(CurrentClient.GetNumberOfWarnings() >= 3)
 		    {
 		      //Remove the User as he exceeded the number of available warnings
 		      CurrentClient.SetValidClient(false);
-		      char WarningMessage[MaxLength] = "Server ::::: You can not send any message now as you have been blocked for saying too many offensive language. \0";
-		      SendToClient(ClientSocket, WarningMessage, MaxLength, false, false);
 
-		      strcpy(WarningMessage, "SERVER::: Notifcation : ");
-		      char ClientName [100] ;
-		      int length = CurrentClient.GetName(ClientName);
+		      NotificationMessage.SetMessage("You can not send any message now as you have been blocked for saying too many offensive language.");
 
-		      strcat(WarningMessage, ClientName);
+		      int Length = NotificationMessage.Serialize(WarningMessage);
+		      SendToClient(ClientSocket, WarningMessage, Length, false, false);
 
-		      strcat(WarningMessage, " has been blocked for saying too many offensive words");
+		      string NotifyingMessageToOtherClients = "Notification : " + CurrentClient.ReceivedClientMessage.GetName() + " has been blocked for saying too many offensive words.";
+		      NotificationMessage.SetMessage(NotifyingMessageToOtherClients);
+		      Length = NotificationMessage.Serialize(WarningMessage);
 
-		      SendToAllClients(WarningMessage, MaxLength, true);
+		      SendToAllClients(WarningMessage, Length, true);
 		    }
 		  else if(CurrentClient.GetNumberOfWarnings() == 2)
 		    {
 		      // More than 2 warnings, then send to him different message
-		      char WarningMessage[MaxLength] = "Server ::::: Last Warning !!! you have said an offensive, and Final Warning, one more time and you will be blocked \0";
-		      SendToClient(ClientSocket, WarningMessage, MaxLength, false, false);
+		      NotificationMessage.SetMessage("Last Warning !!! you have said an offensive, and Final Warning, one more time and you will be blocked");
+		      int Length = NotificationMessage.Serialize(WarningMessage);
+		      SendToClient(ClientSocket, WarningMessage, Length, false, false);
 		    }
 		  else
 		    {
-		      char WarningMessage[MaxLength] = "Server  :::::  Warning !!! you have said an offensive, your message wont be sent to the other members \0";
-		      SendToClient(ClientSocket, WarningMessage, MaxLength, false, false);
+		      NotificationMessage.SetMessage(" Warning !!! you have said an offensive, your message wont be sent to the other members");
+		      int Length = NotificationMessage.Serialize(WarningMessage);
+
+		      SendToClient(ClientSocket, WarningMessage, Length, false, false);
 		    }
 
 		  CurrentClient.IncrementNumberOfWarnings();
@@ -313,9 +322,9 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 		  //	  cout<<"Receiving Failed"<<endl;
 		  WSACleanup();
 		}
-	  }
+	    }
 	}
-//      cout<<"Finished Looping through all clients"<<endl;
+      //      cout<<"Finished Looping through all clients"<<endl;
     }
 }
 
@@ -323,21 +332,20 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 // TODO make it on an another thread but only wake ups every 1 min for now
 void BroadcastMessage(void)
 {
+	ClientMessage ToBeSentMessage;
+	ToBeSentMessage.SetName("SERVER");
+	int Length = 0;
   while(1)
     {
-      char Buffer[MaxLength + SERVER_NAME_LENGTH];
-      strcpy(Buffer, ServerName);
-
-
-      Buffer[SERVER_NAME_LENGTH ] = ' ';
-      Buffer[SERVER_NAME_LENGTH + 1 ] = ':';
-      Buffer[SERVER_NAME_LENGTH + 2 ] = ' ';
+      char Buffer[MaxLength];
+      string ServerMessage;
       cout<<"Enter a BroadcastMessage"<<endl;
+      cin>>ServerMessage;
+	  ToBeSentMessage.SetMessage(ServerMessage);
+	  Length = ToBeSentMessage.Serialize(Buffer);
 
-      //      cout<<"Enter ur message to the client"<<endl;
-      cin.getline( &(Buffer[SERVER_NAME_LENGTH + 3] ) ,MaxLength);
-
-      SendToAllClients(Buffer, MaxLength + SERVER_NAME_LENGTH, true);
+//      cout<<"Will Send the broadcast now"<<endl;
+      SendToAllClients(Buffer, Length, true);
     }
 
 }

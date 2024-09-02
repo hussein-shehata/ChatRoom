@@ -14,9 +14,13 @@
 
 #include <thread>
 
+#include "ClientCode.hpp"
+#include "ClientMessageClass.hpp"
 using namespace std;
 
 static char ClientName [100]="";
+ClientMessage ClientMessageToBeSent;
+ClientMessage ClientMessageReceived;
 
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 
@@ -37,61 +41,66 @@ void ClearAboveLine(void)
 
 void SendNameToServer(SOCKET& ServerSocket)
 {
-  cout<<"Please Enter Your Name"<<endl;
-  cin.getline(ClientName,100);
+	cout<<"Please Enter Your Name"<<endl;
+	cin.getline(ClientName,100);
 
-  char FlagToServer[100] = "#!#!";
-  strcat(FlagToServer, ClientName);
+	ClientMessageToBeSent.SetName(ClientName);
+	ClientMessageToBeSent.SetNewNameFlag(true);
+	char Buffer[260];
+	int Length = ClientMessageToBeSent.Serialize(Buffer);
 
-  int ByteCount = send(ServerSocket, FlagToServer, (100 + 100), 0);
+	int ByteCount = send(ServerSocket, Buffer, Length, 0);
 
-        if(ByteCount > 0)
-  	{
-
-  	}
-        else
-  	{
-  	  WSACleanup();
-  	}
-
+	if(ByteCount > 0)
+	{
+//		cout<<"Sending Name Succeded"<<endl;
+	}
+	else
+	{
+		cout<<"Sending Name Failed"<<endl;
+		WSACleanup();
+	}
+	ClientMessageToBeSent.SetNewNameFlag(false);
 }
+//TODO Change This function to receive the message to be sent and make that we sent to the server the name and the message as a class and make the message a string not a char array
+
 void SendToServer(SOCKET ServerSocket, int MaxLength)
 {
-  while(1)
-    {
-      char Buffer[MaxLength + 100];
-      strcpy(Buffer, ClientName);
-      int i = 0;
-      while (Buffer[i] != '\0' &&  i < 100)
-      {
-	  i++;
+	while(1)
+	{
+		string Message ="";
+		getline(cin, Message);
+		SendToServerMessage(ServerSocket, MaxLength, Message);
+		ClearAboveLine();
+	}
+}
 
-      }
-      int ClientNameLength = i ;
-      Buffer[ClientNameLength] = ' ';
-      Buffer[ClientNameLength + 1 ] = ':';
-      Buffer[ClientNameLength + 2 ] = ' ';
-      //      cout<<"Enter your message to the server"<<endl;
-      cin.getline(&Buffer[ClientNameLength + 3 ],MaxLength);
-      ClearAboveLine();
-      if(Buffer[ClientNameLength + 3 ] == '\n' ||  Buffer[ClientNameLength + 3 ] == '\0')
+
+
+void SendToServerMessage(SOCKET ServerSocket, int MaxLength, string Message)
+{
+
+	ClientMessageToBeSent.SetMessage(Message);
+	char Buffer[52000];
+	int Length = ClientMessageToBeSent.Serialize(Buffer);
+
+	//      if(Buffer[ClientNameLength + 3 ] == '\n' ||  Buffer[ClientNameLength + 3 ] == '\0')
+	//	{
+	//	  //Do not send enter alone
+	//	  cout<<"You only entered an enter alone"<<endl;
+	//	  continue;
+	//	}
+	int ByteCount = send(ServerSocket, Buffer, Length, 0);
+
+	if(ByteCount > 0)
 	{
-	  //Do not send enter alone
-	  cout<<"You only entered an enter alone"<<endl;
-	  continue;
+//			  cout<<"Sent Successfully"<<endl;
 	}
-      int ByteCount = send(ServerSocket, Buffer, (MaxLength + 100), 0);
-//      cout<<"Buffer is "<<Buffer<<"Contninue"<<endl;
-      if(ByteCount > 0)
+	else
 	{
-//	  cout<<"Sent Successfully"<<endl;
+		  cout<<"Send Failed"<<endl;
+		WSACleanup();
 	}
-      else
-	{
-//	  cout<<"Send Failed"<<endl;
-	  WSACleanup();
-	}
-    }
 }
 
 
@@ -101,19 +110,20 @@ void ReceiveFromServer(SOCKET ServerSocket, int MaxLength) //TODO we can make a 
 {
   while(1)
     {
+	  char Buffer[MaxLength + 100];
+	  int ByteCount = recv(ServerSocket, Buffer, (MaxLength + 100), 0);
 
-      char Buffer[MaxLength + 100];
-      int ByteCount = recv(ServerSocket, Buffer, (MaxLength + 100), 0);
-
-      if(ByteCount > 0)
-	{
-	  cout<<Buffer<<endl;
-	}
+	  if(ByteCount > 0)
+	  {
+		  ClientMessageReceived.Deserialize(Buffer);
+		  cout<<ClientMessageReceived.GetName()<<" : "<<ClientMessageReceived.GetClientMessage()<<endl;
+	  }
       else
 	{
 //	  cout<<"Receiving Failed"<<endl;
 	  WSACleanup();
 	}
+
     }
 }
 
@@ -149,7 +159,37 @@ void SetColor(int textColor)
     cout << "\033[" << textColor << "m";
 }
 
-int main() {
+
+void TestSerialization()
+{
+	string SentName = "Hussein";
+	string SentMessage = "Hello my message is hello bs fe haga 8areba msh 3arf eh hia lsa bs hnshof";
+
+	string ReceivedMessage = "";
+	string ReceivedName = "";
+	ClientMessageToBeSent.SetName(SentName);
+	ClientMessageToBeSent.SetMessage(SentMessage);
+	char Buffer[52000];
+	int Length = ClientMessageToBeSent.Serialize(Buffer);
+
+	cout<<"First Buffer is ::: ";
+		for (int idx = 0; idx < Length;idx++)
+		{
+			cout<<Buffer[idx];
+		}
+		cout<<endl;
+
+	const char* ReceivedBuffer = &Buffer[0];
+
+	ClientMessageReceived.Deserialize(ReceivedBuffer);
+	ReceivedMessage = ClientMessageReceived.GetClientMessage();
+	ReceivedName = ClientMessageReceived.GetName();
+
+	cout<<"Name is "<< ReceivedName <<endl<<"Message is "<<ReceivedMessage<<endl;
+}
+
+int main()
+{
   enableANSI(); // Enable ANSI escape codes on Windows
   SOCKET 	clientSocket;
   int port = 55555;
