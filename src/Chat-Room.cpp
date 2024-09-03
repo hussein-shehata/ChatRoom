@@ -165,6 +165,10 @@ void SendToAllClients(char* ToBeSentMessage, int Length, bool Broadcast)
 	  // Dont Send any messages for a blocked client or clients whom didnt enter their name yet
 	  continue;
 	}
+      if(CurrentClient.GetClientSocket() == -1)
+	{
+	  continue;
+	}
 
       SOCKET CurrentClientSocket = CurrentClient.GetClientSocket();
       SendToClient(CurrentClientSocket, ToBeSentMessage, Length, Broadcast, true);
@@ -205,7 +209,10 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	{
 	  char Buffer[MaxLength];
 	  SOCKET ClientSocket = CurrentClient.GetClientSocket();
-
+	  if(ClientSocket == -1)
+	    {
+	      continue;
+	    }
 
 	  setsockopt( ClientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)); //setting Timeout
 	  int ByteCount = recv(ClientSocket, Buffer, MaxLength, 0);
@@ -261,6 +268,13 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	      bool DetectedOffensiveLanguage = false;
 	      string ReceivedMessage = CurrentClient.ReceivedClientMessage.GetClientMessage();
 	      int Length = CurrentClient.ReceivedClientMessage.GetLengthOfMessage();
+	    //Simulate that if the second letter is A we want to disconnect
+		if (ReceivedMessage[1] == 'A')
+		{
+		  closesocket(CurrentClient.GetClientSocket());
+		  SOCKET Temp = -1;
+		  CurrentClient.SetClientSocket(&Temp);
+		}
 	      //TODO if there is  Offensive language in the received message make the boolen value = true and send a warning to the client
 	      if(ReceivedMessage[1] == 'Q')
 		{
