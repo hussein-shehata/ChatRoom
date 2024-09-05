@@ -138,11 +138,13 @@ bool IsAMessageToServer(Client& CurrentClient)
       ClientMessage ToBeSentMessage;
       ToBeSentMessage.SetName("SERVER");
       ToBeSentMessage.SetMessage("Please Welcome our new member : " + CurrentClient.ReceivedClientMessage.GetName());
+      ToBeSentMessage.SetNotifyingNewMemberFlag(true);
 
       int Length = ToBeSentMessage.Serialize(Buffer);
 
       CurrentClient.SetValidClient(true);
       SendToAllClients(Buffer, Length, true);
+      ToBeSentMessage.SetNotifyingNewMemberFlag(false);
 
 
       return true;
@@ -168,6 +170,7 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	{
 	  char Buffer[MaxLength];
 	  SOCKET ClientSocket = CurrentClient.GetClientSocket();
+	  // TODO handling Client Disconnect
 	  if(ClientSocket == -1)
 	    {
 	      continue;
@@ -358,8 +361,6 @@ void SendMembersStatus(Client& RequesterClient)
   int Length = 0;
   char Buffer[MaxLength] = " ";
 
-  // Send to client Dummy Data to unblock him from the receiving statement
-  SendToClient(RequesterClient.GetClientSocket(), Buffer, 1, false, false);
   for (Client& CurrentClient: AcceptedClients)
     {
       ToBeSentMessage.SetName(CurrentClient.GetName());

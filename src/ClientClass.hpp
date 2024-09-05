@@ -39,6 +39,7 @@ class Client{
     bool GetValidClient();
     void SetValidClient(bool Flag);
 
+    // TODO will be removed as they are unused so far
     bool CheckIfFriends(string Name);
     void AddFriend(string Name);
 
