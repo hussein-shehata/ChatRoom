@@ -7,25 +7,9 @@
 
 #include "ClientClass.hpp"
 using namespace std;
-int Client::GetName(char* RecevingBuffer)
+string Client::GetName()
 {
-//  if(Name[0] == 0)
-//    {
-//      //Do not have a name yet
-//      ValidClient = false;
-//      return 0;
-//    }
-//
-//  int idx = 0;
-//  while(Name[idx] != '\0' && Name[idx] != '\n')
-//    {
-//      idx++;
-//    }
-//  memcpy(RecevingBuffer, Name, ((idx) * sizeof(char) )  );
-//  RecevingBuffer[idx] = '\0';
-//
-//  return (idx+1);
-
+  return ReceivedClientMessage.GetName();
 }
 void Client::PrintName(void)
 {
@@ -92,4 +76,21 @@ SOCKET& Client::GetClientSocket()
 //  cout<<"From inside the Getter";
 //  cout<<"Socket is "<<ClientSocket<<endl;
   return ClientSocket;
+}
+
+bool Client::CheckIfFriends(string Name)
+{
+  for (const string& CurrentFriend : FriendList )
+    {
+      if(CurrentFriend == Name)
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+void Client::AddFriend(string Name)
+{
+  FriendList.push_back(Name);
 }

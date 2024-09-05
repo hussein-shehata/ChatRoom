@@ -11,20 +11,23 @@
 #include <winsock2.h>
 #include <iostream>
 #include "ClientMessageClass.hpp"
+#include <vector>
 
 class Client{
   private:
 
-//    char Buffer[100]="";
+//    string ClientName[100]="";
     int NumberOfWarnings = 0;
     SOCKET ClientSocket = 0;
     bool ValidClient = false;
+
+    vector<string> FriendList;
 
 
   public:
     ClientMessage ReceivedClientMessage;//TODO make it private with getter
     Flags MessageFlags; //TODO make it private with getter
-    int GetName(char* RecevingBuffer);
+    string GetName();
     int SetName(char* RecevedName);
     void PrintName(void);
 
@@ -35,6 +38,9 @@ class Client{
 
     bool GetValidClient();
     void SetValidClient(bool Flag);
+
+    bool CheckIfFriends(string Name);
+    void AddFriend(string Name);
 
 };
 

@@ -8,10 +8,12 @@
 
 #include "ClientMessageClass.hpp"
 using namespace std;
-ClientMessage::ClientMessage():Name(""), Message("")
+ClientMessage::ClientMessage():Name(""), Message(""), RecevingEndName("")
 {
 	MessageFlags.NewAvatarFlag = 0;
 	MessageFlags.NewNameFlag = 0;
+	MessageFlags.PrivateMessageFlag = 0;
+	MessageFlags.RequestingMembersUpdate = 0;
 }
 
 string ClientMessage::GetName(void) const
@@ -23,6 +25,12 @@ string ClientMessage::GetClientMessage(void) const
 	return Message;
 }
 
+string ClientMessage::GetRecevingEndName(void) const
+{
+  return RecevingEndName;
+}
+
+
 void ClientMessage::SetName(string NewName)
 {
 	Name = NewName;
@@ -30,6 +38,12 @@ void ClientMessage::SetName(string NewName)
 void ClientMessage::SetMessage(string NewMessage)
 {
 	Message = NewMessage;
+}
+
+
+void ClientMessage::SetRecevingEndName(string Name)
+{
+  RecevingEndName = Name;
 }
 
 unsigned char ClientMessage::GetNewNameFlag(void)
@@ -42,13 +56,34 @@ void ClientMessage::SetNewNameFlag(bool NewFlag)
 	MessageFlags.NewNameFlag = NewFlag & 0x01;
 }
 
+unsigned char ClientMessage::GetPrivateMessageFlag(void)
+{
+  return MessageFlags.PrivateMessageFlag;
+}
+
+void ClientMessage::SetPrivateMessageFlag(bool NewFlag)
+{
+	MessageFlags.PrivateMessageFlag = NewFlag & 0x01;
+}
+
+unsigned char ClientMessage::GetRequestingMembersUpdate(void)
+{
+  return MessageFlags.RequestingMembersUpdate;
+}
+
+void ClientMessage::SetRequestingMembersUpdate(bool NewFlag)
+{
+  MessageFlags.RequestingMembersUpdate = NewFlag & 0x01;
+}
 
 /**************************Format of Buffer Message
  * First Byte : Flags;
  * Second Byte: Length of Name
  * Third-> N Byte : Name
  * N+1 -> N+3 : Length of Message ( Max 56K Bytes)
- * N+4 -> ....: Message
+ * N+4 -> N+4+Length: Message
+ * M->M+1 Length of receiving client
+ * M+2 ->.... Name of Receiving Client
  *
  */
 
@@ -74,6 +109,18 @@ int ClientMessage::Serialize(char* Buffer)
 	memcpy(&(Buffer[StartOfMessageLengthByte]), &MessageLength, sizeof(unsigned short));
 
 	memcpy(&(Buffer[StartOfMessageLengthByte + 2]), Message.data(), sizeof(unsigned char) * MessageLength); // Excluding the null terminator
+
+	if(MessageFlags.PrivateMessageFlag == 1)
+	  {
+	    //Then we have name of client in the Receiving end
+	    unsigned int StartOfRecevingEndNamePart = StartOfMessageLengthByte + 2 + MessageLength;
+	    NameLength = RecevingEndName.size();
+	    TotalLength = TotalLength + NameLength + 1;
+
+	    memcpy(&(Buffer[StartOfRecevingEndNamePart]), &NameLength, sizeof(NameLength));
+
+	    memcpy(&(Buffer[StartOfRecevingEndNamePart + 1]), RecevingEndName.data(), sizeof(unsigned char) * NameLength); // Excluding the null terminator
+	  }
 
 	return TotalLength;
 }
@@ -101,6 +148,18 @@ void ClientMessage::Deserialize(const char* Buffer)
 	ReceivedMessage.resize(ReceivedMessageLength);
 	memcpy(&ReceivedMessage[0], &(Buffer[StartOfMessageLengthByte + 2]), sizeof(unsigned char) * ReceivedMessageLength);
 
+
+	if(ReveivedMessageFlags.PrivateMessageFlag == 1)
+	  {
+	    //Then we have name of client in the Receiving end
+	    unsigned int StartOfRecevingEndNamePart = StartOfMessageLengthByte + 2 + ReceivedMessageLength;
+	    memcpy(&NameLength, &(Buffer[StartOfRecevingEndNamePart]), sizeof(NameLength));
+	    RecevingEndName.resize(NameLength);
+
+	    memcpy(&RecevingEndName[0], &(Buffer[StartOfRecevingEndNamePart + 1]), sizeof(unsigned char) * NameLength);
+
+	  }
+
 	SetFlags(ReveivedMessageFlags);
 	SetName(ReceivedName);
 	SetMessage(ReceivedMessage);
@@ -112,7 +171,8 @@ void ClientMessage::SetFlags(Flags ReveivedMessageFlags)
 {
 	MessageFlags.NewNameFlag = ReveivedMessageFlags.NewNameFlag;
 	MessageFlags.NewAvatarFlag = ReveivedMessageFlags.NewAvatarFlag;
-
+	MessageFlags.PrivateMessageFlag = ReveivedMessageFlags.PrivateMessageFlag;
+	MessageFlags.RequestingMembersUpdate = ReveivedMessageFlags.RequestingMembersUpdate;
 }
 
 int ClientMessage::GetLengthOfMessage()
@@ -123,5 +183,7 @@ int ClientMessage::GetLengthOfMessage()
 	TotalLength = TotalLength + NameLength + 1;
 	unsigned short MessageLength = Message.size();
 	TotalLength = TotalLength + MessageLength + 2;
+
+	return TotalLength;
 
 }
