@@ -31,6 +31,8 @@ void BroadcastMessage(void);
 void SendMembersStatus(Client& CurrentClient);
 void EstablishConnectionBetweenTwoClients(string FirstClientName, string SecondClientName);
 
+static void DeleteClient(Client& CurrentClient);
+
 int  ServerRun();
 
 

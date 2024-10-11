@@ -19,7 +19,9 @@ typedef struct
 		unsigned char NewAvatarFlag : 1;
 		unsigned char PrivateMessageFlag :1;
 		unsigned char RequestingMembersUpdate :1;
+		// TODO Change the name to make it member change as it indicates that the member left or joined
 		unsigned char NotifyingNewMemberFlag :1;
+		unsigned char ExitFlag : 1;
 
 }Flags;
 
@@ -46,9 +48,12 @@ public:
 
 	unsigned char GetPrivateMessageFlag(void);
 	void SetPrivateMessageFlag(bool);
-
+	
 	unsigned char GetRequestingMembersUpdate(void);
 	void SetRequestingMembersUpdate(bool);
+
+	unsigned char GetExitFlag(void);
+	void SetExitFlag(bool);
 
 	unsigned char GetNotifyingNewMemberFlag(void);
 	void SetNotifyingNewMemberFlag(bool);

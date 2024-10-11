@@ -7,6 +7,11 @@
 
 #include "ClientClass.hpp"
 using namespace std;
+
+Client::~Client()
+{
+  // closesocket(ClientSocket);
+}
 string Client::GetName()
 {
   return ReceivedClientMessage.GetName();

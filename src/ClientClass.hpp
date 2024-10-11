@@ -43,6 +43,8 @@ class Client{
     bool CheckIfFriends(string Name);
     void AddFriend(string Name);
 
+    ~Client();
+
 };
 
 #endif /* CLIENTCLASS_HPP_ */

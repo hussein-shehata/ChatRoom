@@ -14,7 +14,6 @@ static char ServerName [SERVER_NAME_LENGTH + 1]= "SERVER";
 
 int MaxLength = 52000;
 
-vector<SOCKET> AcceptedClientsSockets;
 vector<Client> AcceptedClients;
 
 
@@ -54,10 +53,25 @@ static Client& GetClientByName(string Name)
     }
 
 }
+static void  DeleteClient(Client& CurrentClient)
+{
+  cout<<"Will Delete Client with name "<<CurrentClient.GetName()<<endl;
+  int ClientIndex = 0;
+  for (Client& Client : AcceptedClients)
+    {
+      if(CurrentClient.GetName() == Client.GetName())
+      	{
+      	  // Delete Client as it will the desctructor which will close the connection
+	  AcceptedClients.erase(AcceptedClients.begin() + ClientIndex);
+      	}
+      ClientIndex++;
+    }
+}
 
 
 void SendToClient(const SOCKET &ClientSocket,char* ToBeSentMessage, int Length, bool Broadcast, bool AllClients)
 {
+  // NOTE the next 3 blocks are the same in calling the same api with the same parameters, either keep one or remeber why you made three blocks
 	if(Broadcast == true)
 	{
 		/// Broadcasting a server message like giving a maintenance warning
@@ -116,10 +130,6 @@ void SendToAllClients(char* ToBeSentMessage, int Length, bool Broadcast)
 	  // Dont Send any messages for a blocked client or clients whom didnt enter their name yet
 	  continue;
 	}
-      if(CurrentClient.GetClientSocket() == -1)
-	{
-	  continue;
-	}
 
       SOCKET CurrentClientSocket = CurrentClient.GetClientSocket();
       SendToClient(CurrentClientSocket, ToBeSentMessage, Length, Broadcast, true);
@@ -131,6 +141,8 @@ bool IsAMessageToServer(Client& CurrentClient)
 
   unsigned char Flag = CurrentClient.ReceivedClientMessage.GetNewNameFlag();
   unsigned char RequestMemberUpdateFlag = CurrentClient.ReceivedClientMessage.GetRequestingMembersUpdate();
+  unsigned char NotifyingExitingClient = CurrentClient.ReceivedClientMessage.GetExitFlag();
+
   char Buffer[MaxLength];
   if( (Flag & 0x01) == 1)
     {
@@ -155,6 +167,23 @@ bool IsAMessageToServer(Client& CurrentClient)
       SendMembersStatus(CurrentClient);
       return true;
     }
+
+  else if ( (NotifyingExitingClient & 0x01) == 1)
+    {
+      DeleteClient(CurrentClient);
+      // Send to all the Clients that the Client has left
+      ClientMessage ToBeSentMessage;
+      ToBeSentMessage.SetName("Server");
+      ToBeSentMessage.SetMessage("The User : " + CurrentClient.ReceivedClientMessage.GetName() + " has left.");
+      ToBeSentMessage.SetNotifyingNewMemberFlag(true);
+
+      int Length = ToBeSentMessage.Serialize(Buffer);
+
+      SendToAllClients(Buffer, Length, true);
+      ToBeSentMessage.SetNotifyingNewMemberFlag(false);
+
+      return true;
+    }
   return false;
 
 }
@@ -170,11 +199,6 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	{
 	  char Buffer[MaxLength];
 	  SOCKET ClientSocket = CurrentClient.GetClientSocket();
-	  // TODO handling Client Disconnect
-	  if(ClientSocket == -1)
-	    {
-	      continue;
-	    }
 
 	  setsockopt( ClientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)); //setting Timeout
 	  int ByteCount = recv(ClientSocket, Buffer, MaxLength, 0);
@@ -188,7 +212,7 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 		}
 	      else
 		{
-		  cout<<"error in Receving the message"<<endl;
+		  cout<<"error in Receving the message from "<<CurrentClient.GetName()<<"with Error code "<<WSAGetLastError()<<endl;
 		  WSACleanup();
 		  return ;
 		}
@@ -230,13 +254,6 @@ void ReceiveFromClients() //TODO we can make a parameter to receive the incoming
 	      bool DetectedOffensiveLanguage = false;
 	      string ReceivedMessage = CurrentClient.ReceivedClientMessage.GetClientMessage();
 	      int Length = CurrentClient.ReceivedClientMessage.GetLengthOfMessage();
-	    //Simulate that if the second letter is A we want to disconnect
-		if (ReceivedMessage[1] == 'A')
-		{
-		  closesocket(CurrentClient.GetClientSocket());
-		  SOCKET Temp = -1;
-		  CurrentClient.SetClientSocket(&Temp);
-		}
 	      //TODO if there is  Offensive language in the received message make the boolen value = true and send a warning to the client
 	      if(ReceivedMessage[1] == 'Q')
 		{
@@ -354,6 +371,7 @@ void EstablishConnectionBetweenTwoClients(string FirstClientName, string SecondC
 }
 // TODO make the status enums and may be handle the function more properly
 // TODO make the server send the number of clients first so the client can handle them properly, can do it with flag
+// TODO make that we dont send the name of the disconnected members
 void SendMembersStatus(Client& RequesterClient)
 {
   ClientMessage ToBeSentMessage;

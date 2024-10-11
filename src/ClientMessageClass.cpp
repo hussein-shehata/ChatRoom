@@ -15,6 +15,7 @@ ClientMessage::ClientMessage():Name(""), Message(""), RecevingEndName("")
 	MessageFlags.PrivateMessageFlag = 0;
 	MessageFlags.RequestingMembersUpdate = 0;
 	MessageFlags.NotifyingNewMemberFlag = 0;
+	MessageFlags.ExitFlag = 0;
 }
 
 string ClientMessage::GetName(void) const
@@ -86,6 +87,15 @@ unsigned char ClientMessage::GetNotifyingNewMemberFlag(void)
 void ClientMessage::SetNotifyingNewMemberFlag(bool NewFlag)
 {
   MessageFlags.NotifyingNewMemberFlag = NewFlag & 0x01;
+}
+
+unsigned char ClientMessage::GetExitFlag(void)
+{
+  return MessageFlags.ExitFlag;
+}
+void ClientMessage::SetExitFlag(bool NewFlag)
+{
+  MessageFlags.ExitFlag = NewFlag & 0x01;
 }
 
 /**************************Format of Buffer Message
@@ -186,6 +196,7 @@ void ClientMessage::SetFlags(Flags ReveivedMessageFlags)
 	MessageFlags.PrivateMessageFlag = ReveivedMessageFlags.PrivateMessageFlag;
 	MessageFlags.RequestingMembersUpdate = ReveivedMessageFlags.RequestingMembersUpdate;
 	MessageFlags.NotifyingNewMemberFlag = ReveivedMessageFlags.NotifyingNewMemberFlag;
+	MessageFlags.ExitFlag = ReveivedMessageFlags.ExitFlag;
 
 }
 
